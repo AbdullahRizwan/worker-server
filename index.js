@@ -51,11 +51,7 @@ amqp.connect('amqp://localhost', (err, conn) => {
         const rec_body = JSON.parse(message.content);
         console.log(rec_body);
         console.log(`[x] Received email: ${rec_body.emails}`);
-  
-        // Call the verify_email function here to verify the email
         
-        // print all emails
-      
         Promise.all(rec_body.emails.map((email) => verify_email(email))).then(
             (results) => {
               const file = new File({

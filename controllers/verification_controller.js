@@ -41,7 +41,6 @@ export class VerificationController {
           if (!err) console.log("success with klean", "User added successfully!");
           else {
             console.log("Error during record insertion with klean: "+ email + '\n' + err);
-            // console.log('\n' + raw_data)
         
           }
         });

@@ -307,6 +307,7 @@ const deductCredits = async (username, credits) => {
     return false;
   }
   user.credits = user.credits - credits;
+  user.consumed_credits = user.consumed_credits + credits;
   const result = await user.save();
   if (!result) return false;
   return true;

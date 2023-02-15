@@ -30,6 +30,11 @@ const userSchema = new mongoose.Schema({
     required: true,
     default: 0,
   },
+  consumed_credits: {
+    type: Number,
+    required: true,
+    default: 0,
+  },
   email: {
     type: String,
     required: true,
