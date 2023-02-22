@@ -22,14 +22,27 @@ connectDB();
 
 const controller = new VerificationController();
 
+const Methods = {
+  KLEAN: 0,
+  CLEAROUT: 1,
+  BOTH: 2,
+}
 
-const verify_email = async (email) => {
+const verify_email = async (email, method) => {
     const cached_queries = await verify_email_in_db(email);
     if (cached_queries.length > 0) {
       return Promise.resolve(cached_queries[0]);
     }
-    return controller.klean_api_request(email);
-  
+    // return controller.klean_api_request(email);
+    if (method == Methods.KLEAN) {
+      return controller.klean_api_request(email);
+    }
+    if (method == Methods.CLEAROUT) {
+      return controller.clearout_api_request(email);
+    }
+    if (method == Methods.BOTH) {
+      return controller.klean_api_request(email);
+    }
 };
 
 
@@ -51,8 +64,9 @@ amqp.connect('amqp://localhost', (err, conn) => {
         const rec_body = JSON.parse(message.content);
         console.log(rec_body);
         console.log(`[x] Received email: ${rec_body.emails}`);
+        const method = rec_body.method;
         
-        Promise.all(rec_body.emails.map((email) => verify_email(email))).then(
+        Promise.all(rec_body.emails.map((email) => verify_email(email, method))).then(
             (results) => {
               const file = new File({
                 filename: rec_body.filename,
