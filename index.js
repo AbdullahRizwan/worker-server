@@ -6,9 +6,11 @@ import amqp from "amqplib/callback_api.js";
 import { config } from "dotenv";
 import {connectDB} from './config/db.js';
 
+
 import {
     VerificationController,
     verify_email_in_db,
+    verify_email_scheduled,
   } from "./controllers/verification_controller.js";
 
 import {
@@ -19,6 +21,7 @@ import {
 
 config({path:'./config/.env'})
 connectDB();
+
 
 const controller = new VerificationController();
 
@@ -34,14 +37,15 @@ const verify_email = async (email, method) => {
       return Promise.resolve(cached_queries[0]);
     }
     // return controller.klean_api_request(email);
+    console.log("method" + '' + method)
     if (method == Methods.KLEAN) {
       return controller.klean_api_request(email);
     }
     if (method == Methods.CLEAROUT) {
-      return controller.clearout_api_request(email);
+      return controller.clearout_email_verification(email);
     }
     if (method == Methods.BOTH) {
-      return controller.klean_api_request(email);
+      return verify_email_scheduled(email)      
     }
 };
 
@@ -75,7 +79,7 @@ amqp.connect('amqp://localhost', (err, conn) => {
                 verifications: results,
               });
               file.save();
-        
+              console.log(results)
               const valid_count = results.filter((result) => result.is_valid).length;
               const invalid_count = results.filter((result) => !result.is_valid).length;
               addVerificationToUser(
