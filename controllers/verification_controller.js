@@ -28,8 +28,6 @@ export class VerificationController {
       .then((response) => {
         
         const raw_data = response.data;
-        console.log("\n\n")
-        console.log(raw_data);
         const verification = new Verification({
           email: raw_data["record"],
           is_valid: raw_data["is_exist"] ? true : false,
@@ -38,17 +36,16 @@ export class VerificationController {
         });
 
         verification.save((err, doc) => {
-          if (!err) console.log("success with klean", "User added successfully!");
-          else {
-            console.log("Error during record insertion with klean: "+ email + '\n' + err);
+          if (err)
+            console.log("Error during record insertion with klean: "+ email + '\n' + err.message);
         
-          }
+          
         });
 
         return verification;
       })
       .catch((err) => {
-        console.log(err);
+        console.log(err.message);
         if (depth < 3) {
           return this.klean_api_request(email, depth + 1);
         }
@@ -60,8 +57,8 @@ export class VerificationController {
             verified_on: new Date(),
           });
           verification.save((err, doc) => {
-            if (!err) console.log("success", "User added successfully!");
-            else console.log("Error during record insertion : " + err);
+            if (err)
+            console.log("Error during record insertion with klean: "+ email + '\n' + err.message);
           });
   
           return verification;
@@ -105,9 +102,7 @@ const controller = new VerificationController();
 
 export const verify_email_scheduled = async (email) => {
   const cached_queries = await verify_email_in_db(email);
-  console.log(cached_queries);
   if (cached_queries.length > 0) {
-    console.log("Found");
     return Promise.resolve(cached_queries[0]);
   }
 
@@ -124,7 +119,7 @@ export const verify_email_scheduled = async (email) => {
       }
     })
     .catch((err) => {
-      console.log(err);
+      console.log(err.message);
     });
   await new Promise((r) => setTimeout(r, 5000));
   if (isResolved) {
@@ -138,7 +133,7 @@ export const verify_email_scheduled = async (email) => {
       }
     })
     .catch((err) => {
-      console.log(err);
+      console.log(err.message);
     });
   await new Promise((r) => setTimeout(r, 5000));
   if (isResolved) {
@@ -153,6 +148,6 @@ export const verify_email_scheduled = async (email) => {
       }
     })
     .catch((err) => {
-      console.log(err);
+      console.log(err.message);
     });
 }; 

@@ -34,7 +34,6 @@ const verify_email = async (email, method) => {
     return Promise.resolve(cached_queries[0]);
   }
   // return controller.klean_api_request(email);
-  console.log("method" + "" + method);
   if (method == Methods.KLEAN) {
     return controller.klean_api_request(email);
   }
@@ -48,7 +47,7 @@ const verify_email = async (email, method) => {
 
 amqp.connect("amqp://localhost", (err, conn) => {
   if (err) {
-    console.error(err);
+    console.error(err.message);
   }
 
   conn.createChannel((err, channel) => {
@@ -56,15 +55,11 @@ amqp.connect("amqp://localhost", (err, conn) => {
 
     channel.assertQueue(queue, { durable: false });
 
-    console.log(`[*] Waiting for messages in ${queue}. To exit press CTRL+C`);
 
     channel.consume(
       queue,
       (message) => {
-        console.log(`[-->] Received ${message.content}`);
         const rec_body = JSON.parse(message.content);
-        console.log(rec_body);
-        console.log(`[x] Received email: ${rec_body.emails}`);
         const method = rec_body.method;
         try {
           Promise.all(
@@ -78,7 +73,6 @@ amqp.connect("amqp://localhost", (err, conn) => {
                 verifications: results,
               });
               file.save();
-              console.log(results);
               const valid_count = results.filter(
                 (result) => result.is_valid
               ).length;
@@ -92,16 +86,15 @@ amqp.connect("amqp://localhost", (err, conn) => {
                 invalid_count
               ).then((_) => {
                 removeInProgress(rec_body.query_id);
-                console.log(rec_body.firebase_key);
                 const url = `https://everify-326212-default-rtdb.asia-southeast1.firebasedatabase.app/${rec_body.firebase_key}.json`;
                 axios.delete(url);
               });
             })
             .catch((err) => {
-              console.log(err);
+              console.log(err.message);
             });
         } catch (err) {
-          console.log(err);
+          console.log(err.message);
         }
       },
       { noAck: true }
