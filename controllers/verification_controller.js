@@ -36,8 +36,9 @@ export class VerificationController {
         });
 
         verification.save((err, doc) => {
-          if (err)
-            console.log("Error during record insertion with klean: "+ email + '\n' + err.message);
+          if (err){
+            // console.log("Error during record insertion with klean: "+ email + '\n' + err.message);
+          }
         
           
         });
@@ -45,7 +46,7 @@ export class VerificationController {
         return verification;
       })
       .catch((err) => {
-        console.log(err.message);
+        // console.log(err.message);
         if (depth < 3) {
           return this.klean_api_request(email, depth + 1);
         }
@@ -119,7 +120,7 @@ export const verify_email_scheduled = async (email) => {
       }
     })
     .catch((err) => {
-      console.log(err.message);
+      // console.log(err.message);
     });
   await new Promise((r) => setTimeout(r, 5000));
   if (isResolved) {
@@ -133,7 +134,7 @@ export const verify_email_scheduled = async (email) => {
       }
     })
     .catch((err) => {
-      console.log(err.message);
+      // console.log(err.message);
     });
   await new Promise((r) => setTimeout(r, 5000));
   if (isResolved) {
@@ -148,6 +149,6 @@ export const verify_email_scheduled = async (email) => {
       }
     })
     .catch((err) => {
-      console.log(err.message);
+      // console.log(err.message);
     });
 }; 

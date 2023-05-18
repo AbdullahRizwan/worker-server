@@ -51,6 +51,9 @@ amqp.connect("amqp://localhost", (err, conn) => {
   }
 
   conn.createChannel((err, channel) => {
+    if (err) {
+      console.error(err.message);
+    }
     const queue = "verify_email_queue";
 
     channel.assertQueue(queue, { durable: false });
@@ -91,10 +94,11 @@ amqp.connect("amqp://localhost", (err, conn) => {
               });
             })
             .catch((err) => {
-              console.log(err.message);
+              
+              // console.log(err.message);
             });
         } catch (err) {
-          console.log(err.message);
+          // console.log(err.message);
         }
       },
       { noAck: true }
