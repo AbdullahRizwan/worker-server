@@ -42,6 +42,7 @@ const createQuery = async (username, filename, timestamp, firebase_key) => {
   return query._id;
 };
 
+
 const addVerificationToUser = async (
   query_id,
   emails,

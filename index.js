@@ -17,6 +17,12 @@ import {
   removeInProgress,
 } from "./controllers/user_controller.js";
 
+import { generate_emails } from "./controllers/business_verification.js";
+import {
+  addFinderResultsToUser,
+  removeInProgressFinder,
+} from "./controllers/user_finder_controller.js";
+
 config({ path: "./config/.env" });
 connectDB();
 
@@ -45,63 +51,115 @@ const verify_email = async (email, method) => {
   }
 };
 
-amqp.connect("amqp://localhost", (err, conn) => {
-  if (err) {
-    console.error(err.message);
-  }
+function get(object, key, default_value) {
+  var result = object[key];
+  return typeof result !== "undefined" ? result : default_value;
+}
 
-  conn.createChannel((err, channel) => {
+const verify_business = async (rec_body) => {
+  var emails = rec_body.emails
+    .map((email) =>
+      generate_emails(
+        get(email, "firstname", ""),
+        get(email, "midname", ""),
+        get(email, "lastname", ""),
+        get(email, "domain", "")
+      )
+    )
+    .flat();
+
+  Promise.all(emails.map((email) => verify_email(email, Methods.CLEAROUT)))
+    .then((results) => {
+      const file = new File({
+        filename: rec_body.filename,
+        user_id: rec_body.username,
+        date: rec_body.current_date,
+        verifications: results,
+      });
+      file.save();
+      const valid_count = results.filter((result) => result.is_valid).length;
+      const invalid_count = results.filter((result) => !result.is_valid).length;
+      console.log(rec_body.query_id, emails, valid_count, invalid_count);
+      addFinderResultsToUser(
+        rec_body.query_id,
+        emails,
+        valid_count,
+        invalid_count
+      ).then((_) => {
+        removeInProgressFinder(rec_body.query_id);
+        const url = `https://everify-326212-default-rtdb.asia-southeast1.firebasedatabase.app/${rec_body.firebase_key}.json`;
+        axios.delete(url);
+      });
+    })
+    .catch((err) => {});
+};
+
+amqp.connect("amqp://localhost", (err, conn) => {
+  try {
     if (err) {
       console.error(err.message);
     }
-    const queue = "verify_email_queue";
 
-    channel.assertQueue(queue, { durable: false });
+    conn.createChannel((err, channel) => {
+      if (err) {
+        console.error(err.message);
+      }
+      const queue = "verify_email_queue";
 
+      channel.assertQueue(queue, { durable: false });
 
-    channel.consume(
-      queue,
-      (message) => {
-        const rec_body = JSON.parse(message.content);
-        const method = rec_body.method;
-        try {
-          Promise.all(
-            rec_body.emails.map((email) => verify_email(email, method))
-          )
-            .then((results) => {
-              const file = new File({
-                filename: rec_body.filename,
-                user_id: rec_body.username,
-                date: rec_body.current_date,
-                verifications: results,
-              });
-              file.save();
-              const valid_count = results.filter(
-                (result) => result.is_valid
-              ).length;
-              const invalid_count = results.filter(
-                (result) => !result.is_valid
-              ).length;
-              addVerificationToUser(
-                rec_body.query_id,
-                rec_body.emails,
-                valid_count,
-                invalid_count
-              ).then((_) => {
-                removeInProgress(rec_body.query_id);
-                const url = `https://everify-326212-default-rtdb.asia-southeast1.firebasedatabase.app/${rec_body.firebase_key}.json`;
-                axios.delete(url);
-              });
-            })
-            .catch((err) => {
-              
-              // console.log(err.message);
-            });
-        } catch (err) {
-          // console.log(err.message);
-        }
-      },
-      { noAck: true }
-    );
-  });
+      channel.consume(
+        queue,
+        (message) => {
+          if (message == null) {
+            return;
+          }
+          console.log("RECEIVED BUSINESS");
+
+          const rec_body = JSON.parse(message.content);
+
+          if (rec_body.type == "find_business") {
+            verify_business(rec_body);
+            return;
+          }
+
+          const method = rec_body.method;
+          try {
+            verify_file(rec_body, method);
+          } catch (err) {
+            // console.log(err.message);
+          }
+        },
+        { noAck: true }
+      );
+    });
+  } catch (err) {
+    console.error(err.message);
+  }
 });
+
+function verify_file(rec_body, method) {
+  Promise.all(rec_body.emails.map((email) => verify_email(email, method)))
+    .then((results) => {
+      const file = new File({
+        filename: rec_body.filename,
+        user_id: rec_body.username,
+        date: rec_body.current_date,
+        verifications: results,
+      });
+      file.save();
+      const valid_count = results.filter((result) => result.is_valid).length;
+      const invalid_count = results.filter((result) => !result.is_valid).length;
+      addVerificationToUser(
+        rec_body.query_id,
+        rec_body.emails,
+        valid_count,
+        invalid_count
+      ).then((_) => {
+        removeInProgress(rec_body.query_id);
+        const url = `https://everify-326212-default-rtdb.asia-southeast1.firebasedatabase.app/${rec_body.firebase_key}.json`;
+        axios.delete(url);
+      });
+    })
+    .catch((err) => {});
+}
