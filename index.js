@@ -51,10 +51,13 @@ const verify_email = async (email, method) => {
   }
 };
 
+
 function get(object, key, default_value) {
   var result = object[key];
   return typeof result !== "undefined" ? result : default_value;
 }
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const verify_business = async (rec_body) => {
   var emails = rec_body.emails
@@ -68,31 +71,68 @@ const verify_business = async (rec_body) => {
     )
     .flat();
 
-  Promise.all(emails.map((email) => verify_email(email, Methods.CLEAROUT)))
-    .then((results) => {
-      const file = new File({
-        filename: rec_body.filename,
-        user_id: rec_body.username,
-        date: rec_body.current_date,
-        verifications: results,
-      });
-      file.save();
-      const valid_count = results.filter((result) => result.is_valid).length;
-      const invalid_count = results.filter((result) => !result.is_valid).length;
-      console.log(rec_body.query_id, emails, valid_count, invalid_count);
-      addFinderResultsToUser(
-        rec_body.query_id,
-        emails,
-        valid_count,
-        invalid_count
-      ).then((_) => {
-        removeInProgressFinder(rec_body.query_id);
-        const url = `https://everify-326212-default-rtdb.asia-southeast1.firebasedatabase.app/${rec_body.firebase_key}.json`;
-        axios.delete(url);
-      });
-    })
-    .catch((err) => {});
+  const verify_email_with_retry = async (email, method, retryCount = 0) => {
+    try {
+      await delay(2000); // 2-second delay
+      return await verify_email(email, method);
+    } catch (error) {
+      if (error.response && error.response.status === 429 && retryCount < 3) {
+        const retryDelay = Math.pow(2, retryCount) * 1000; // Backoff exponentially
+        await delay(retryDelay);
+        return await verify_email_with_retry(email, method, retryCount + 1);
+      }
+      throw error;
+    }
+  };
+
+  // Custom function to wrap verify_email calls with a delay and retry
+  const verify_email_with_delay_and_retry = async (email, method) => {
+    return verify_email_with_retry(email, method);
+  };
+
+  const batchSize = 50;
+  const totalEmails = emails.length;
+  var results = [];
+  for (let i = 0; i < totalEmails; i += batchSize) {
+    const batchEmails = emails.slice(i, i + batchSize);
+    const batchResults = await Promise.all(batchEmails.map((email) => verify_email_with_delay_and_retry(email, Methods.CLEAROUT)));
+    results = results.concat(batchResults);
+    // Process batch results here...
+    // For example, you can save the results to the database or perform any other operations.
+
+    // Check if there are more emails to process and add a 30-second delay if needed
+    if (i + batchSize < totalEmails) {
+      await delay(10000); // 10-second delay
+    }
+    console.log("Batch processed", i + batchSize, "emails");
+  }
+
+  // All batches processed, continue with the rest of the code...
+
+  // Save the final file and other operations as before
+  const file = new File({
+    filename: rec_body.filename,
+    user_id: rec_body.username,
+    date: rec_body.current_date,
+    verifications: results,
+  });
+  file.save();
+  const valid_count = results.filter((result) => result.is_valid).length;
+  const invalid_count = results.filter((result) => !result.is_valid).length;
+  console.log(rec_body.query_id, emails, valid_count, invalid_count);
+  addFinderResultsToUser(
+    rec_body.query_id,
+    emails,
+    valid_count,
+    invalid_count
+  ).then((_) => {
+    removeInProgressFinder(rec_body.query_id);
+    const url = `https://everify-326212-default-rtdb.asia-southeast1.firebasedatabase.app/${rec_body.firebase_key}.json`;
+    axios.delete(url);
+  });
 };
+
+
 
 amqp.connect("amqp://localhost", (err, conn) => {
   try {
