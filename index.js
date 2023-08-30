@@ -51,7 +51,6 @@ const verify_email = async (email, method) => {
   }
 };
 
-
 function get(object, key, default_value) {
   var result = object[key];
   return typeof result !== "undefined" ? result : default_value;
@@ -95,7 +94,11 @@ const verify_business = async (rec_body) => {
   var results = [];
   for (let i = 0; i < totalEmails; i += batchSize) {
     const batchEmails = emails.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batchEmails.map((email) => verify_email_with_delay_and_retry(email, Methods.CLEAROUT)));
+    const batchResults = await Promise.all(
+      batchEmails.map((email) =>
+        verify_email_with_delay_and_retry(email, Methods.CLEAROUT)
+      )
+    );
     results = results.concat(batchResults);
     // Process batch results here...
     // For example, you can save the results to the database or perform any other operations.
@@ -132,51 +135,53 @@ const verify_business = async (rec_body) => {
   });
 };
 
-
-
-amqp.connect("amqp://localhost", (err, conn) => {
-  try {
-    if (err) {
-      console.error(err.message);
-    }
-
-    conn.createChannel((err, channel) => {
+try {
+  amqp.connect("amqp://localhost", (err, conn) => {
+    try {
       if (err) {
         console.error(err.message);
       }
-      const queue = "verify_email_queue";
 
-      channel.assertQueue(queue, { durable: false });
+      conn.createChannel((err, channel) => {
+        if (err) {
+          console.error(err.message);
+        }
+        const queue = "verify_email_queue";
 
-      channel.consume(
-        queue,
-        (message) => {
-          if (message == null) {
-            return;
-          }
-          console.log("RECEIVED BUSINESS");
+        channel.assertQueue(queue, { durable: false });
 
-          const rec_body = JSON.parse(message.content);
+        channel.consume(
+          queue,
+          (message) => {
+            if (message == null) {
+              return;
+            }
+            console.log("RECEIVED BUSINESS");
 
-          if (rec_body.type == "find_business") {
-            verify_business(rec_body);
-            return;
-          }
+            const rec_body = JSON.parse(message.content);
 
-          const method = rec_body.method;
-          try {
-            verify_file(rec_body, method);
-          } catch (err) {
-            // console.log(err.message);
-          }
-        },
-        { noAck: true }
-      );
-    });
-  } catch (err) {
-    console.error(err.message);
-  }
-});
+            if (rec_body.type == "find_business") {
+              verify_business(rec_body);
+              return;
+            }
+
+            const method = rec_body.method;
+            try {
+              verify_file(rec_body, method);
+            } catch (err) {
+              // console.log(err.message);
+            }
+          },
+          { noAck: true }
+        );
+      });
+    } catch (err) {
+      console.error(err.message);
+    }
+  });
+} catch (err) {
+  console.log(err.message);
+}
 
 function verify_file(rec_body, method) {
   Promise.all(rec_body.emails.map((email) => verify_email(email, method)))
