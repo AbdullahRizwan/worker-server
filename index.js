@@ -140,6 +140,7 @@ try {
     try {
       if (err) {
         console.error(err.message);
+        return;
       }
 
       conn.createChannel((err, channel) => {
@@ -180,7 +181,7 @@ try {
     }
   });
 } catch (err) {
-  console.log(err.message);
+  console.log("Error occured but server is runing", err.message);
 }
 
 function verify_file(rec_body, method) {
