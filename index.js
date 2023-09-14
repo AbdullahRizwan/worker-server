@@ -142,7 +142,6 @@ try {
         console.error(err.message);
         return;
       }
-      conn.basicQos(10); 
       conn.createChannel((err, channel) => {
         if (err) {
           console.error(err.message);
