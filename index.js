@@ -142,6 +142,10 @@ try {
         console.error(err.message);
         return;
       }
+      conn.on('error', function(e){
+        console.log("Error", e.message);
+      })
+
       conn.createChannel((err, channel) => {
         if (err) {
           console.error(err.message);
