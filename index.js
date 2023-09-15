@@ -1,7 +1,7 @@
 import { File } from "./models/file.js";
 import axios from "axios";
 
-import amqp from "amqplib/callback_api.js";
+import amqps from "amqplib/callback_api.js";
 
 import { config } from "dotenv";
 import { connectDB } from "./config/db.js";
@@ -136,7 +136,7 @@ const verify_business = async (rec_body) => {
 };
 
 try {
-  amqp.connect("amqp://localhost", (err, conn) => {
+  amqps.connect("amqp://localhost", (err, conn) => {
     try {
       if (err) {
         console.error(err.message);
@@ -149,6 +149,9 @@ try {
       conn.createChannel((err, channel) => {
         if (err) {
           console.error(err.message);
+
+
+
         }
         const queue = "verify_email_queue";
 
