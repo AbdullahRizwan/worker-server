@@ -144,6 +144,7 @@ try {
       }
       conn.on('error', function(e){
         console.log("Error", e.message);
+        setTimeout(connectToAMQP, 5000); // Reconnect after 5 seconds
       })
 
       conn.createChannel((err, channel) => {
