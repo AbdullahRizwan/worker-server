@@ -1,7 +1,8 @@
 import { File } from "./models/file.js";
 import axios from "axios";
 
-import amqps from "amqplib/callback_api.js";
+import amqp from 'amqplib';
+
 
 import { config } from "dotenv";
 import { connectDB } from "./config/db.js";
@@ -135,62 +136,48 @@ const verify_business = async (rec_body) => {
   });
 };
 
-try {
-  amqps.connect("amqp://localhost", (err, conn) => {
-    try {
-      if (err) {
-        console.error(err.message);
+async function connectToAMQP() {
+  try {
+    const conn = await amqp.connect('amqp://localhost');
+    console.log('Connected to AMQP');
+
+    conn.on('error', function (e) {
+      console.error('Error', e.message);
+      setTimeout(connectToAMQP, 5000); // Reconnect after 5 seconds
+    });
+
+    const channel = await conn.createChannel();
+
+    const queue = 'verify_email_queue';
+
+    await channel.assertQueue(queue, { durable: false });
+
+    channel.consume(queue, async (message) => {
+      if (message == null) {
         return;
       }
-      conn.on('error', function(e){
-        console.log("Error", e.message);
-        setTimeout(connectToAMQP, 5000); // Reconnect after 5 seconds
-      })
+      console.log('RECEIVED BUSINESS');
 
-      conn.createChannel((err, channel) => {
-        if (err) {
-          console.error(err.message);
+      const rec_body = JSON.parse(message.content);
 
+      if (rec_body.type === 'find_business') {
+        verify_business(rec_body);
+        return;
+      }
 
-
-        }
-        const queue = "verify_email_queue";
-
-        
-        channel.assertQueue(queue, { durable: false });
-
-        channel.consume(
-          queue,
-          (message) => {
-            if (message == null) {
-              return;
-            }
-            console.log("RECEIVED BUSINESS");
-
-            const rec_body = JSON.parse(message.content);
-
-            if (rec_body.type == "find_business") {
-              verify_business(rec_body);
-              return;
-            }
-
-            const method = rec_body.method;
-            try {
-              verify_file(rec_body, method);
-            } catch (err) {
-              // console.log(err.message);
-            }
-          },
-          { noAck: true }
-        );
-      });
-    } catch (err) {
-      console.error(err.message);
-    }
-  });
-} catch (err) {
-  console.log("Error occured but server is runing", err.message);
+      const method = rec_body.method;
+      try {
+        verify_file(rec_body, method);
+      } catch (err) {
+        console.error(err.message);
+      }
+    }, { noAck: true });
+  } catch (err) {
+    console.error('Error occurred but the server is running', err.message);
+  }
 }
+
+connectToAMQP();
 
 function verify_file(rec_body, method) {
   Promise.all(rec_body.emails.map((email) => verify_email(email, method)))
