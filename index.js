@@ -138,7 +138,7 @@ const verify_business = async (rec_body) => {
 
 async function connectToAMQP() {
   try {
-    const conn = await amqp.connect('amqp://localhost');
+    const conn = await amqp.connect('amqp://localhost', { heartbeat: 10 }); // Adjust the heartbeat value (in seconds)
     console.log('Connected to AMQP');
 
     conn.on('error', function (e) {
