@@ -143,6 +143,7 @@ async function connectToAMQP() {
 
     conn.on('error', function (e) {
       console.error('Error', e.message);
+      conn.close();
       setTimeout(connectToAMQP, 5000); // Reconnect after 5 seconds
     });
 
@@ -168,10 +169,15 @@ async function connectToAMQP() {
       const method = rec_body.method;
       try {
         verify_file(rec_body, method);
+        
       } catch (err) {
         console.error(err.message);
+        channel.close();
+        console.log("Connection closed");
+
       }
     }, { noAck: true });
+
   } catch (err) {
     console.error('Error occurred but the server is running', err.message);
   }
