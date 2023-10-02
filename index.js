@@ -136,25 +136,21 @@ const verify_business = async (rec_body) => {
   });
 };
 
-async function connectToAMQP() {
+let amqpConnection = null;
+let amqpChannel = null;
+
+async function setupAMQP() {
   try {
-    const conn = await amqp.connect('amqp://localhost', { heartbeat: 0 }); // Adjust the heartbeat value (in seconds)
-    console.log('Connected to AMQP');
+    // Create a new channel
+    amqpChannel = await amqpConnection.createChannel();
 
-    conn.on('error', function (e) {
-      console.error('Error', e.message);
-      conn.close();
-      setTimeout(connectToAMQP, 5000); // Reconnect after 5 seconds
-    });
+    // Assert that the 'verify_email_queue' queue exists
+    await amqpChannel.assertQueue('verify_email_queue', { durable: false });
 
-    const channel = await conn.createChannel();
-
-    const queue = 'verify_email_queue';
-
-    await channel.assertQueue(queue, { durable: false });
-
-    channel.consume(queue, async (message) => {
+    // Consume messages from the 'verify_email_queue' queue
+    amqpChannel.consume('verify_email_queue', (message) => {
       if (message == null) {
+        console.log('RECEIVED EMPTY BUSINESS');
         return;
       }
       console.log('RECEIVED BUSINESS');
@@ -178,8 +174,35 @@ async function connectToAMQP() {
       }
     }, { noAck: true });
 
+    console.log(" [*] Waiting for messages. To exit press CTRL+C");
+
   } catch (err) {
-    console.error('Error occurred but the server is running', err.message);
+    console.error('Setup failed:', err);
+  }
+}
+
+async function connectToAMQP() {
+  try {
+    const conn = await amqp.connect('amqp://localhost', { heartbeat: 0 }); // Adjust the heartbeat value (in seconds)
+
+    conn.on('error', (err) => {
+      console.error('AMQP connection error:', err);
+      if (conn) {
+        conn.close();
+      }
+    });
+
+    conn.on('close', () => {
+      console.log('AMQP connection closed, reconnecting...');
+      setTimeout(connectToAMQP, 5000);
+    });
+
+    amqpConnection = conn;
+    await setupAMQP();
+
+  } catch (err) {
+    console.error('Failed to connect:', err);
+    setTimeout(connectToAMQP, 5000); // Retry connection after 5 seconds
   }
 }
 
