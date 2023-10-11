@@ -47,7 +47,7 @@ export class VerificationController {
       })
       .catch((err) => {
         // console.log(err.message);
-        if (depth < 3) {
+        if (depth < 8) {
           return this.klean_api_request(email, depth + 1);
         }
         else {
